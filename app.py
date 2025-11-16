@@ -1,7 +1,13 @@
 from binance import AsyncClient, BinanceSocketManager
-from keys import API_KEY, API_SECRET
+from dotenv import load_dotenv
+import os
 import asyncio
 import sys
+
+load_dotenv()
+
+API_KEY = os.getenv("API_KEY")
+API_SECRET = os.getenv("API_SECRET")
 
 async def get_market_data(client, symbol="BTCUSDT"):
 	
