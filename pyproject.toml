@@ -1,0 +1,18 @@
+[project]
+name = "cripto-bot"
+version = "0.1.0"
+description = "Bot for trade criptos"
+authors = [
+    {name = "Ruan Souza"}
+]
+license = {text = "CC-BY-NC-SA"}
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "python-binance (>=1.0.32,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
