@@ -1,43 +1,189 @@
+from time import sleep
+
 from binance import AsyncClient, BinanceSocketManager
 from dotenv import load_dotenv
+from data import get_conn
+from datetime import datetime
+import sqlite3
 import os
 import asyncio
 import sys
+import time
 
 load_dotenv()
 
 API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
+COOLDOWN_PRICES = 20
 
-async def get_market_data(client, symbol="BTCUSDT"):
-	
-	while True:
-		price_btc = float((await client.get_symbol_ticker(symbol="BTCUSDT"))["price"])
-		balance_btc = float((await client.get_asset_balance(asset="BTC"))["free"])
-		balance_usdt = float((await client.get_asset_balance(asset="USDT"))["free"])
-		
-		msg = f"BTC Price: {price_btc:.2f} | BTC Balance: {balance_btc} | USDT Balance: {balance_usdt}"
-		sys.stdout.write("\r"+msg)
-		sys.stdout.flush()
-		
-		await asyncio.sleep(5)
-		
-async def get_market_prices(client, symbol="BTCUSDT", n=20, period=3):
-	prices = []
-	
-	for _ in range(n):
-		price = float(await client.get_symbol_ticker(symbol=symbol)["price"])
-		prices.append(price)
-		
-		await asyncio.sleep(period)
-	
-	return prices
+def log_order(cur, order_type, price, quantity, profit=None):
+	time_stamp = int(time.time() * 1000)
+	cur.execute("""INSERT INTO orders (order_type, price_usdt, quantity, time_stamp, profit_percent)
+	                   VALUES (?, ?, ?, ?, ?)""", (order_type, price, quantity, time_stamp, profit))
+	cur.connection.commit()
+
+def get_buy_amount(usdt):
+	return 100 if usdt >= 100 else usdt
+
+def calc_profit(actual_price, cost, fee=0.002):
+	return (actual_price - cost) / cost - fee
+
+def get_local_wallet():
+	conn = get_conn()
+	cur = conn.cursor()
+
+	cur.execute("SELECT btc, usdt, cost FROM wallet LIMIT 1")
+	btc, usdt, cost = cur.fetchone()
+	return btc, usdt, cost
+
+def update_local_wallet(btc, usdt, cost):
+	conn = get_conn()
+	cur = conn.cursor()
+
+	cur.execute("UPDATE wallet SET btc = ?, usdt = ?, cost = ?", (btc, usdt, cost))
+	conn.commit()
+
+
+async def analyze_market(prices):
+	if len(prices) < 20:
+		return 0, "Coletando dados..."
+	price_min = min(prices)
+	price_max = max(prices)
+	price_now = prices[-1]
+	volatility = ((price_max - price_min) / price_now) * 100
+
+	if volatility < 0.5:
+		market_type = "lateral"
+	elif volatility > 1.5:
+		market_type = "volatile"
+	else:
+		if prices[-1] > prices[0]:
+			market_type = "uptrend"
+		else:
+			market_type = "downtrend"
+
+	return volatility, market_type
+
+async def strategy_lateral(client, actual_price, cost, btc, usdt, last_trade_index, prices):
+	conn = get_conn()
+	cur = conn.cursor()
+
+	last_trade_index = last_trade_index or 0
+	new_prices_count = len(prices) - last_trade_index
+
+	# STARTER BUY
+	if btc == 0 and usdt > 5 and new_prices_count >= COOLDOWN_PRICES:
+		buy_amount = get_buy_amount(usdt)
+		order = await client.order_market_buy(symbol="BTCUSDT", quoteOrderQty=buy_amount)
+		cost = float(order["fills"][0]["price"])
+		btc = float(order["fills"][0]["qty"])
+
+		usdt -= buy_amount
+		last_trade_index = len(prices)
+
+		log_order(cur, "BUY", cost, btc)
+
+		print(f"[BUY] BTC={btc}, USDT={usdt}, Price={cost}")
+
+		return btc, usdt, cost, last_trade_index
+
+	# IF ALREADY HAVE BTC
+	if btc > 0:
+		profit = calc_profit(actual_price, cost)
+
+		# TAKE PROFIT
+		if profit >= 0.005:
+
+			# SELL ALL BTC
+			await client.order_market_sell(symbol="BTCUSDT", quantity=btc)
+			usdt += btc * actual_price
+
+			log_order(cur, "SELL", actual_price, btc, profit)
+
+			btc = 0
+			cost = 0
+
+			# BUYBACK USING AVAILABLE BALANCE
+			if usdt > 5 and new_prices_count >= COOLDOWN_PRICES:
+				buy_amount = get_buy_amount(usdt)
+				order = await client.order_market_buy(symbol="BTCUSDT", quoteOrderQty=buy_amount)
+				btc = float(order["fills"][0]["qty"])
+				cost = float(order["fills"][0]["price"])
+				usdt -= buy_amount
+				last_trade_index = len(prices)
+
+				log_order(cur, "BUY", cost, btc)
+
+				print(f"[BUYBACK] BTC={btc}, USDT={usdt}, Price={cost}")
+
+			return btc, usdt, cost, last_trade_index
+
+		# STOP LOSS
+		if profit <= -0.003:
+			order = await client.order_market_sell(symbol="BTCUSDT", quantity=btc)
+			usdt += btc * actual_price
+
+			log_order(cur, "SELL", actual_price, btc, profit)
+
+			btc = 0
+			cost = 0
+			last_trade_index = len(prices)
+
+
+			print(f"[STOP LOSS] BTC vendido, USDT={usdt}")
+
+			return btc, usdt, cost, last_trade_index
+
+	# NO ACTION
+	return btc, usdt, cost, last_trade_index
+
+
+
 
 async def main():
 	client = await AsyncClient.create(API_KEY, API_SECRET, testnet=True)
+	bsm = BinanceSocketManager(client)
+
+	socket = bsm.trade_socket("BTCUSDT")
+
+	prices = []
 	
 	try:
-		await get_market_data(client)
+		async with socket as stream:
+			while True:
+				msg = await stream.recv()
+
+				price = float(msg["p"])
+				prices.append(price)
+
+				if len(prices) > 20:
+					prices.pop(0)
+
+				volatility, market_type = await analyze_market(prices)
+
+				local_btc, local_usdt, cost = get_local_wallet()
+
+				local_btc, local_usdt, cost, last_trade_index = await strategy_lateral(
+					client,
+					actual_price=price,
+					cost=cost,
+					btc=local_btc,
+					usdt=local_usdt,
+					last_trade_index=last_trade_index,
+					prices=prices
+				)
+				update_local_wallet(local_btc, local_usdt, cost)
+
+				log = (f"Price BTC: {price:.2f} | Local BTC: {local_btc:.8f} | "
+					   f"Local USDT: {local_usdt:.2f} | Vol: {volatility:.2f}% | "
+					   f"Market: {market_type}")
+
+				sys.stdout.write("\r" + " " * 300 + "\r")
+				sys.stdout.write(log)
+				sys.stdout.flush()
+
+				await asyncio.sleep(0.1)
+
 	except Exception as e:
 		print("ERRO REAL: ", e)
 	finally:
