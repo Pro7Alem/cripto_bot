@@ -16,6 +16,61 @@ API_KEY = os.getenv("API_KEY")
 API_SECRET = os.getenv("API_SECRET")
 COOLDOWN_PRICES = 20
 
+
+async def sell_order(client, btc, usdt, cost, profit):
+	conn = get_conn()
+	cur = conn.cursor()
+	sell_price = None
+
+	try:
+		order = await client.order_market_sell(symbol="BTCUSDT", quantity=btc)
+		sell_price = float(order["fills"][0]["price"])
+
+		sold_amount = btc
+		usdt += btc * sell_price
+		btc = 0
+		cost = None
+
+		log_order(cur, "SELL", sell_price, sold_amount, profit)
+		conn.commit()
+
+	except Exception as e:
+		print("ERRO REAL: ", e)
+
+	finally:
+		conn.close()
+
+	return btc, usdt, cost, sell_price
+
+async def buy_order(client, btc, usdt, cost):
+	conn = get_conn()
+	cur = conn.cursor()
+	buy_amount = get_buy_amount(usdt)
+
+	if buy_amount == 0:
+		print("[BUY SKIPPED] Insufficient USDT")
+
+		return btc, usdt, cost
+
+	try:
+		order = await client.order_market_buy(symbol="BTCUSDT", quoteOrderQty=buy_amount)
+		cost = float(order["fills"][0]["price"])
+		btc = float(order["fills"][0]["qty"])
+
+		usdt -= buy_amount
+
+		log_order(cur, "BUY", cost, btc)
+		conn.commit()
+
+	except Exception as e:
+		print("ERRO REAL: ", e)
+		return btc, usdt, cost
+
+	finally:
+		conn.close()
+
+	return btc, usdt, cost
+
 def log_order(cur, order_type, price, quantity, profit=None):
 	time_stamp = int(time.time() * 1000)
 	cur.execute("""INSERT INTO orders (order_type, price_usdt, quantity, time_stamp, profit_percent)
@@ -23,6 +78,11 @@ def log_order(cur, order_type, price, quantity, profit=None):
 	cur.connection.commit()
 
 def get_buy_amount(usdt):
+	min_amount = 5
+	if usdt < min_amount:
+
+		return 0
+
 	return 100 if usdt >= 100 else usdt
 
 def calc_profit(actual_price, cost, fee=0.002):
@@ -65,54 +125,35 @@ async def analyze_market(prices):
 	return volatility, market_type
 
 async def strategy_lateral(client, actual_price, cost, btc, usdt, last_trade_index, prices):
-	conn = get_conn()
-	cur = conn.cursor()
-
 	last_trade_index = last_trade_index or 0
 	new_prices_count = len(prices) - last_trade_index
 
 	# STARTER BUY
-	if btc == 0 and usdt > 5 and new_prices_count >= COOLDOWN_PRICES:
-		buy_amount = get_buy_amount(usdt)
-		order = await client.order_market_buy(symbol="BTCUSDT", quoteOrderQty=buy_amount)
-		cost = float(order["fills"][0]["price"])
-		btc = float(order["fills"][0]["qty"])
-
-		usdt -= buy_amount
+	if btc == 0 and usdt > 0 and new_prices_count >= COOLDOWN_PRICES:
+		btc, usdt, cost = await buy_order(client, btc, usdt, cost)
 		last_trade_index = len(prices)
-
-		log_order(cur, "BUY", cost, btc)
-
 		print(f"[BUY] BTC={btc}, USDT={usdt}, Price={cost}")
 
 		return btc, usdt, cost, last_trade_index
 
 	# IF ALREADY HAVE BTC
 	if btc > 0:
-		profit = calc_profit(actual_price, cost)
+		if cost is None:
+			return btc, usdt, cost, last_trade_index
+		else:
+			profit = calc_profit(actual_price, cost)
 
 		# TAKE PROFIT
 		if profit >= 0.005:
 
 			# SELL ALL BTC
-			await client.order_market_sell(symbol="BTCUSDT", quantity=btc)
-			usdt += btc * actual_price
-
-			log_order(cur, "SELL", actual_price, btc, profit)
-
-			btc = 0
-			cost = 0
+			btc, usdt, cost, sell_price = await sell_order(client, btc, usdt, cost, profit)
+			last_trade_index = len(prices)
 
 			# BUYBACK USING AVAILABLE BALANCE
-			if usdt > 5 and new_prices_count >= COOLDOWN_PRICES:
-				buy_amount = get_buy_amount(usdt)
-				order = await client.order_market_buy(symbol="BTCUSDT", quoteOrderQty=buy_amount)
-				btc = float(order["fills"][0]["qty"])
-				cost = float(order["fills"][0]["price"])
-				usdt -= buy_amount
+			if usdt > 0 and new_prices_count >= COOLDOWN_PRICES:
+				btc, usdt, cost = await buy_order(client, btc, usdt, cost)
 				last_trade_index = len(prices)
-
-				log_order(cur, "BUY", cost, btc)
 
 				print(f"[BUYBACK] BTC={btc}, USDT={usdt}, Price={cost}")
 
@@ -120,15 +161,8 @@ async def strategy_lateral(client, actual_price, cost, btc, usdt, last_trade_ind
 
 		# STOP LOSS
 		if profit <= -0.003:
-			order = await client.order_market_sell(symbol="BTCUSDT", quantity=btc)
-			usdt += btc * actual_price
-
-			log_order(cur, "SELL", actual_price, btc, profit)
-
-			btc = 0
-			cost = 0
+			btc, usdt, cost, sell_price = await sell_order(client, btc, usdt, cost, profit)
 			last_trade_index = len(prices)
-
 
 			print(f"[STOP LOSS] BTC vendido, USDT={usdt}")
 
@@ -147,7 +181,8 @@ async def main():
 	socket = bsm.trade_socket("BTCUSDT")
 
 	prices = []
-	
+	last_trade_index = 0
+
 	try:
 		async with socket as stream:
 			while True:
