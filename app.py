@@ -111,22 +111,29 @@ async def analyze_market(prices):
 	price_max = max(prices)
 	price_now = prices[-1]
 	volatility = ((price_max - price_min) / price_now) * 100
+	force = None
 
 	if volatility < 0.5:
 		market_type = "lateral"
 	elif volatility > 1.5:
-		market_type = "volatile"
-	else:
+		slope = ((prices[-1] - prices[0]) / prices[0])* 100
+		force = ("weak" if abs(slope) < 0.3 else
+				 "medium" if abs(slope) < 0.7 else
+				 "strong")
+			 
 		if prices[-1] > prices[0]:
-			market_type = "uptrend"
+			market_type = "volatile-uptrend"
 		else:
-			market_type = "downtrend"
+			market_type = "volatile-downtrend"
+	else:
+		market_type = "moderate"
 
-	return volatility, market_type
+	return volatility, market_type, force
 
 async def strategy_lateral(client, actual_price, cost, btc, usdt, last_trade_index, prices):
 	last_trade_index = last_trade_index or 0
 	new_prices_count = len(prices) - last_trade_index
+	_, market_type, _ = await analyze_market(prices)
 
 	# STARTER BUY
 	if btc == 0 and usdt > 0 and new_prices_count >= COOLDOWN_PRICES:
@@ -160,7 +167,7 @@ async def strategy_lateral(client, actual_price, cost, btc, usdt, last_trade_ind
 			return btc, usdt, cost, last_trade_index
 
 		# STOP LOSS
-		if profit <= -0.003:
+		if profit <= -0.003 or (market_type != "lateral" and profit >= 0.002):
 			btc, usdt, cost, sell_price = await sell_order(client, btc, usdt, cost, profit)
 			last_trade_index = len(prices)
 
@@ -194,7 +201,7 @@ async def main():
 				if len(prices) > 20:
 					prices.pop(0)
 
-				volatility, market_type = await analyze_market(prices)
+				volatility, market_type, force = await analyze_market(prices)
 
 				local_btc, local_usdt, cost = get_local_wallet()
 
