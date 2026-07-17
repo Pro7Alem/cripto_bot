@@ -1,5 +1,6 @@
 # Environment items
 *.env
+*.venv
 *.geany
 
 # Database
@@ -7,3 +8,13 @@
 
 # Temporary scripts
 test.py
+
+# IDE
+.vscode/
+.idea/
+__pycache__/
+*py[cod]
+
+# Development files
+*.log
+.ruff_cache/
