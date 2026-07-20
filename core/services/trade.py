@@ -32,6 +32,11 @@ async def buy(client, btc, usdt, cost):
     except Exception as e:
         print("BUY ERROR: ", e)
 
+        if "order" in locals():
+            print("[WARNING] ORDER MAY HAVE EXECUTED. CHECK EXCHANGE STATE")
+
+        return btc, usdt, cost
+
     return btc, usdt, cost
 
 
@@ -39,7 +44,7 @@ async def sell(client, btc, usdt, cost, profit):
 
     if btc == 0:
         print("[SELL SKIPPED] No BTC to sell")
-        return btc, usdt, cost
+        return btc, usdt, cost, None
 
     try:
         # EXECUTE MARKET SELL ORDER
@@ -58,5 +63,7 @@ async def sell(client, btc, usdt, cost, profit):
 
     except Exception as e:
         print("SELL ERROR:", e)
+        
+        return btc, usdt, cost, None
 
-    return btc, usdt, cost
+    return btc, usdt, cost, sell_price
