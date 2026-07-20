@@ -1,12 +1,5 @@
-import os
-
-from dotenv import load_dotenv
 from core.exchange.client import create_socket_manager
-
-
-load_dotenv()
-
-SYMBOL = os.getenv("SYMBOL")
+from core.utils.config import SYMBOL
 
 
 def create_trade_socket(client):

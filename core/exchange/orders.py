@@ -1,11 +1,4 @@
-import os
-
-from dotenv import load_dotenv
-
-
-load_dotenv()
-
-SYMBOL = os.getenv("SYMBOL")
+from core.utils.config import SYMBOL
 
 
 async def market_buy(client, quote_amount: float):

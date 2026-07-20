@@ -1,13 +1,5 @@
-import os
-
 from binance import AsyncClient, BinanceSocketManager
-from dotenv import load_dotenv
-
-
-load_dotenv()
-
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+from core.utils.config import API_KEY, API_SECRET
 
 
 async def create_client():
