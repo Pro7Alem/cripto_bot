@@ -16,6 +16,15 @@ def create_tables():
         btc REAL,
         usdt REAL,
         cost REAL)""")
+    
+    create_command("""CREATE TABLE IF NOT EXISTS market_prices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        symbol TEXT NOT NULL,
+        price_usdt REAL NOT NULL,
+        timestamp INTEGER NOT NULL,
+        market_type TEXT,
+        volatility REAL,
+        force REAL)""")
 
 
 def init_wallet() -> None:
