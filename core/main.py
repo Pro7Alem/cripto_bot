@@ -1,5 +1,6 @@
 import asyncio
 
+from core.bot.trading_bot import TradingBot
 from core.display.terminal import update_dashboard
 from core.exchange.client import create_client
 from core.exchange.market import create_trade_socket
@@ -15,6 +16,7 @@ from core.utils.config import PRICE_WINDOW, get_timestamp
 
 async def main():
     client = await create_client()
+    bot = TradingBot(client)
 
     prices = []
 
@@ -41,6 +43,10 @@ async def main():
             while True:
                 decision = None
                 msg = await stream.recv()
+
+                if "p" not in msg:
+                    print(msg)
+                    continue
 
                 price = float(msg["p"])
 
