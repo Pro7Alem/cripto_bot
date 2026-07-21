@@ -4,7 +4,7 @@ from core.exchange.orders import (
 )
 from core.repository.orders import log_order
 from core.repository.wallet import update_local_wallet
-from core.utils.config import SYMBOL
+from core.utils.config import get_timestamp, SYMBOL
 from core.utils.trading import get_buy_amount
 
 
@@ -25,8 +25,9 @@ async def buy(client, btc, usdt, cost):
         btc += quantity
         usdt -= quote_amount
         cost = price
+        updated_at = get_timestamp()
 
-        update_local_wallet(btc, usdt)
+        update_local_wallet(btc, usdt, updated_at)
 
         log_order(
             order_id=order["orderId"],
@@ -73,8 +74,9 @@ async def sell(client, btc, usdt, cost, profit):
         usdt += quote_amount
         btc = 0
         cost = None
+        updated_at = get_timestamp()
 
-        update_local_wallet(btc, usdt)
+        update_local_wallet(btc, usdt, updated_at)
 
         log_order(
             order_id=order["orderId"],
