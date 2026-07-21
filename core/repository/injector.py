@@ -1,21 +1,37 @@
-from core.repository.db import create_command, exec_command, exec_query
+from core.repository.db import (
+    create_command,
+    exec_command,
+    exec_query
+)
+from core.utils.config import get_timestamp
 
 
 def create_tables():
     # CREATE TABLES IF NOT EXISTS trades AND wallet
     create_command("""CREATE TABLE IF NOT EXISTS trades (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id TEXT,
         order_type TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+                   
         price_usdt REAL NOT NULL,
         quantity REAL NOT NULL,
+                   
+        quote_amount REAL NOT NULL,
+                   
+        fee_asset TEXT,
+        fee_amount REAL,
+                   
         timestamp INTEGER NOT NULL,
+                   
+        profit_usdt REAL,
         profit_percent REAL)""")
 
     create_command("""CREATE TABLE IF NOT EXISTS wallet (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
-        btc REAL,
-        usdt REAL,
-        cost REAL)""")
+        btc REAL NOT NULL,
+        usdt REAL NOT NULL,
+        updated_at INTEGER NOT NULL)""")
     
     create_command("""CREATE TABLE IF NOT EXISTS market_prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -27,15 +43,29 @@ def create_tables():
         force REAL)""")
 
 
-def init_wallet() -> None:
-    # INSERT INITIAL VALUES INTO WALLET
-    exec_command(
-        """INSERT INTO wallet (btc, usdt, cost) VALUES (?, ?, ?)""", (0.0, 100.0, 0.0)
+def init_wallet():
+    current_timestamp = get_timestamp()
+
+    wallet = exec_query(
+        "SELECT * FROM wallet WHERE id = 1"
     )
 
-    wallet = exec_query("SELECT * FROM wallet WHERE id = 1")
+    if wallet:
+        return wallet[0]
 
-    return wallet[0] if wallet else None
+    exec_command(
+        """
+        INSERT INTO wallet (btc, usdt, updated_at)
+        VALUES (?, ?, ?)
+        """,
+        (0.0, 100.0, current_timestamp)
+    )
+
+    wallet = exec_query(
+        "SELECT * FROM wallet WHERE id = 1"
+    )
+
+    return wallet[0]
 
 
 create_tables()
