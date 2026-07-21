@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from core.bot.trading_bot import TradingBot
 from core.display.terminal import update_dashboard
@@ -15,11 +16,10 @@ async def main():
 
         async with socket as stream:
             while True:
-                decision = None
+                start = time.time()
                 msg = await stream.recv()
 
                 if "p" not in msg:
-                    print(msg)
                     continue
 
                 price = float(msg["p"])
@@ -36,15 +36,17 @@ async def main():
 
 
                 bot.log_market(price)
-                
-                
+
+                elapsed = time.time() - start
+
                 update_dashboard(
                     price=price,
                     btc=bot.wallet["btc"],
                     usdt=bot.wallet["usdt"],
                     volatility=bot.market["volatility"],
                     market_type=bot.market["market_type"],
-                    prices_count=len(bot.prices)
+                    prices_count=len(bot.prices),
+                    loop_time=elapsed
                 )
                 
 

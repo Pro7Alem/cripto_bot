@@ -1,7 +1,15 @@
 import sys
 
 
-def update_dashboard(price, btc, usdt, volatility, market_type, prices_count):
+def update_dashboard(
+        price,
+        btc,
+        usdt, 
+        volatility,
+        market_type,
+        prices_count,
+        loop_time
+):
     if prices_count < 20:
         market_display = f"WAITING DATA ({prices_count}/20)"
     else:
@@ -17,6 +25,7 @@ USDT BALANCE:    {usdt:.2f}
 
 VOLATILITY:      {volatility:.2f}%
 MARKET:          {market_display:<25}
+SLOW LOOP:       {loop_time:<25}
 
 ==========================================
 """
