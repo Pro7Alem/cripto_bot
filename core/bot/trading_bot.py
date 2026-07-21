@@ -1,5 +1,5 @@
 from core.repository.market import log_market_price
-from core.repository.orders import get_last_sell_trade
+from core.repository.orders import get_last_sell_trade, get_last_buy_price
 from core.services.trade import buy, sell
 from core.strategy.analyzer import analyze_market
 from core.strategy.lateral import evaluate_lateral
@@ -29,7 +29,18 @@ class TradingBot:
         self.last_market_log = 0
         self.last_market_price = None
 
-        self.wallet = get_local_wallet()
+        db_wallet = get_local_wallet()
+
+        self.wallet = {
+            "btc": db_wallet["btc"],
+            "usdt": db_wallet["usdt"],
+            "cost": None
+        }
+
+        if self.wallet["btc"] > 0:
+            self.wallet["cost"] = get_last_buy_price()
+        else:
+            self.wallet["cost"] = None
 
         last_sell_price = get_last_sell_trade()
 
