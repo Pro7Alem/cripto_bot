@@ -5,7 +5,12 @@ from core.services.trade import buy, sell
 from core.strategy.analyzer import analyze_market
 from core.strategy.lateral import evaluate_lateral
 from core.strategy.reentry import evaluate_reentry
-from core.utils.config import get_timestamp, PRICE_WINDOW
+from core.utils.config import (
+    get_timestamp,
+    PRICE_WINDOW,
+    BTC_PRECISION,
+    USDT_PRECISION
+)
 from core.repository.wallet import get_local_wallet
 
 
@@ -24,7 +29,7 @@ class TradingBot:
 
         db_wallet = get_local_wallet()
 
-        self.wallet = {"btc": db_wallet["btc"], "usdt": db_wallet["usdt"], "cost": None}
+        self.wallet = {"btc": round(db_wallet["btc"], BTC_PRECISION), "usdt": round(db_wallet["usdt"], USDT_PRECISION), "cost": None}
 
         if self.wallet["btc"] > 0:
             self.wallet["cost"] = get_last_buy_price()
@@ -35,10 +40,12 @@ class TradingBot:
         self.reentry["waiting"] = waiting
         self.reentry["prices"].clear()
 
+
     def set_wallet(self, btc, usdt, cost):
-        self.wallet["btc"] = btc
-        self.wallet["usdt"] = usdt
+        self.wallet["btc"] = round(btc, BTC_PRECISION)
+        self.wallet["usdt"] = round(usdt, USDT_PRECISION)
         self.wallet["cost"] = cost
+
 
     def add_price(self, price):
         self.prices.append(price)
@@ -49,12 +56,14 @@ class TradingBot:
         if self.reentry["waiting"]:
             self.reentry["prices"].append((get_timestamp(), price))
 
+
     def analyze_market(self):
         volatility, market_type, force = analyze_market(self.prices)
 
         self.market["volatility"] = volatility
         self.market["market_type"] = market_type
         self.market["force"] = force
+
 
     def evaluate(self, price):
         if self.wallet["btc"] == 0:
@@ -79,6 +88,7 @@ class TradingBot:
             self.market["market_type"],
         )
 
+
     async def execute_buy(self):
         btc, usdt, cost = await buy(
             self.client, self.wallet["btc"], self.wallet["usdt"], self.wallet["cost"]
@@ -86,6 +96,7 @@ class TradingBot:
 
         self.set_wallet(btc, usdt, cost)
         self.set_reentry(False)
+
 
     async def execute_sell(self, profit):
         btc, usdt, cost, sell_price = await sell(
@@ -101,12 +112,14 @@ class TradingBot:
         if sell_price:
             self.set_reentry(True)
 
+
     async def execute(self, decision):
         if decision["action"] == "BUY":
             await self.execute_buy()
 
         elif decision["action"] == "SELL":
             await self.execute_sell(decision["profit"])
+
 
     def log_market(self, price):
         current_timestamp = get_timestamp()
