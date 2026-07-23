@@ -9,4 +9,6 @@ def get_local_wallet():
 
 def update_local_wallet(btc, usdt, updated_at):
     # UPDATE LOCAL WALLET STATE
-    exec_command("UPDATE wallet SET btc = ?, usdt = ?, updated_at = ?", (btc, usdt, updated_at))
+    exec_command(
+        "UPDATE wallet SET btc = ?, usdt = ?, updated_at = ?", (btc, usdt, updated_at)
+    )

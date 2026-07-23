@@ -1,8 +1,4 @@
-from core.repository.db import (
-    create_command,
-    exec_command,
-    exec_query
-)
+from core.repository.db import create_command, exec_command, exec_query
 from core.utils.config import get_timestamp
 
 
@@ -32,7 +28,7 @@ def create_tables():
         btc REAL NOT NULL,
         usdt REAL NOT NULL,
         updated_at INTEGER NOT NULL)""")
-    
+
     create_command("""CREATE TABLE IF NOT EXISTS market_prices (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         symbol TEXT NOT NULL,
@@ -46,9 +42,7 @@ def create_tables():
 def init_wallet():
     current_timestamp = get_timestamp()
 
-    wallet = exec_query(
-        "SELECT * FROM wallet WHERE id = 1"
-    )
+    wallet = exec_query("SELECT * FROM wallet WHERE id = 1")
 
     if wallet:
         return wallet[0]
@@ -58,12 +52,10 @@ def init_wallet():
         INSERT INTO wallet (btc, usdt, updated_at)
         VALUES (?, ?, ?)
         """,
-        (0.0, 100.0, current_timestamp)
+        (0.0, 100.0, current_timestamp),
     )
 
-    wallet = exec_query(
-        "SELECT * FROM wallet WHERE id = 1"
-    )
+    wallet = exec_query("SELECT * FROM wallet WHERE id = 1")
 
     return wallet[0]
 

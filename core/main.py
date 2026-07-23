@@ -28,12 +28,10 @@ async def main():
                 bot.add_price(price)
                 bot.analyze_market()
 
-
                 decision = bot.evaluate(price)
-                
+
                 if decision:
                     await bot.execute(decision)
-
 
                 bot.log_market(price)
 
@@ -46,9 +44,8 @@ async def main():
                     volatility=bot.market["volatility"],
                     market_type=bot.market["market_type"],
                     prices_count=len(bot.prices),
-                    loop_time=elapsed
+                    loop_time=elapsed,
                 )
-                
 
     except Exception as e:
         print("ERROR: ", e)

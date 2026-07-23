@@ -2,19 +2,12 @@ import sys
 
 
 def update_dashboard(
-        price,
-        btc,
-        usdt, 
-        volatility,
-        market_type,
-        prices_count,
-        loop_time
+    price, btc, usdt, volatility, market_type, prices_count, loop_time
 ):
     if prices_count < 20:
         market_display = f"WAITING DATA ({prices_count}/20)"
     else:
         market_display = market_type
-
 
     dashboard = f"""
 ================ BTC BOT ================

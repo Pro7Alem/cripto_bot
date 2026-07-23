@@ -9,7 +9,7 @@ def evaluate_lateral(actual_price, cost, btc, usdt, market_type):
     # HOLD
     if btc > 0 and cost is None:
         return None
-    
+
     profit = calc_profit(actual_price, cost)
 
     # TAKE PROFIT

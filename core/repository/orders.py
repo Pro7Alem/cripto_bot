@@ -1,5 +1,5 @@
 from core.repository.db import exec_command, exec_query
-from core.utils.config import SYMBOL, get_timestamp
+from core.utils.config import get_timestamp
 
 
 def log_order(
@@ -12,8 +12,7 @@ def log_order(
     fee_asset=None,
     fee_amount=None,
     profit_usdt=None,
-    profit_percent=None
-
+    profit_percent=None,
 ):
     # SAVE ORDER TO DATABASE
     current_timestamp = get_timestamp()
@@ -43,8 +42,7 @@ def log_order(
             fee_amount,
             current_timestamp,
             profit_usdt,
-            profit_percent
-
+            profit_percent,
         ),
     )
 
@@ -56,11 +54,11 @@ def get_last_sell_trade():
         WHERE order_type = 'SELL'
         ORDER BY id DESC
         LIMIT 1"""
-        )
-    
+    )
+
     if not result:
         return None
-    
+
     return result[0]["price_usdt"]
 
 
