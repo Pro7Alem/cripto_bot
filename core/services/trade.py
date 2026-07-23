@@ -4,7 +4,7 @@ from core.exchange.orders import (
 )
 from core.repository.orders import log_order
 from core.repository.wallet import update_local_wallet
-from core.utils.config import get_timestamp, SYMBOL
+from core.utils.config import get_timestamp
 from core.utils.trading import get_buy_amount
 
 
@@ -21,7 +21,6 @@ async def buy(client, btc, usdt, cost):
 
         price, quantity, quote_amount, fee_asset, fee_amount = parse_order(order)
 
-
         btc += quantity
         usdt -= quote_amount
         cost = price
@@ -37,8 +36,7 @@ async def buy(client, btc, usdt, cost):
             quantity=quantity,
             quote_amount=quote_amount,
             fee_asset=fee_asset,
-            fee_amount=fee_amount
-
+            fee_amount=fee_amount,
         )
 
     except Exception as e:
@@ -62,14 +60,15 @@ async def sell(client, btc, usdt, cost, profit):
         # EXECUTE MARKET SELL ORDER
         order = await market_sell(client, btc)
 
-        sell_price, sold_amount, quote_amount, fee_asset, fee_amount = parse_order(order)
+        sell_price, sold_amount, quote_amount, fee_asset, fee_amount = parse_order(
+            order
+        )
 
         # REAL PROFIT
         invested = sold_amount * cost
 
         profit_usdt = quote_amount - invested
         profit_percent = profit_usdt / invested
-
 
         usdt += quote_amount
         btc = 0
@@ -88,13 +87,12 @@ async def sell(client, btc, usdt, cost, profit):
             fee_asset=fee_asset,
             fee_amount=fee_amount,
             profit_usdt=profit_usdt,
-            profit_percent=profit_percent
-
+            profit_percent=profit_percent,
         )
 
     except Exception as e:
         print("SELL ERROR:", e)
-        
+
         return btc, usdt, cost, None
 
     return btc, usdt, cost, sell_price
@@ -103,20 +101,11 @@ async def sell(client, btc, usdt, cost, profit):
 def parse_order(order):
     fills = order["fills"]
 
-    quantity = sum(
-        float(fill["qty"])
-        for fill in fills
-    )
+    quantity = sum(float(fill["qty"]) for fill in fills)
 
-    quote_amount = sum(
-        float(fill["price"]) * float(fill["qty"])
-        for fill in fills
-    )
+    quote_amount = sum(float(fill["price"]) * float(fill["qty"]) for fill in fills)
 
-    fee_amount = sum(
-        float(fill["commission"])
-        for fill in fills
-    )
+    fee_amount = sum(float(fill["commission"]) for fill in fills)
 
     fee_asset = fills[0]["commissionAsset"]
 
