@@ -24,3 +24,4 @@ Cada ADR segue o formato abaixo:
 - [008 - Reentrada após venda](./008-reentrada-apos-venda.md)
 - [009 - Persistência de ordens e preços de mercado](./009-persistencia-de-ordens-e-precos-de-mercado.md)
 - [010 - Gestão de carteira e preço médio real](./010-gestao-de-carteira-e-preco-medio.md)
+- [011 - Padrões de `scope` para mensagens de commit](./011-commit-scopes.md)
